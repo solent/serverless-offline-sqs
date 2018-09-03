@@ -60,11 +60,17 @@ class ServerlessOfflineSQS {
         const handler = createHandler(funOptions, {});
 
         const lambdaContext = createLambdaContext(__function, (err, data) => {
-                this.serverless.cli.log(
-                `[${err ? figures.cross : figures.tick}] ${JSON.stringify(data) || ''}`
-            );
-        cb(err, data);
-    });
+                if (err) {
+                    this.serverless.cli.log(
+                        `[${figures.cross}] ${JSON.stringify(err) || ''}`
+                    );
+                } else {
+                    this.serverless.cli.log(
+                        `[${figures.tick}] ${JSON.stringify(data) || ''}`
+                    );
+                }
+            cb(err, data);
+        });
 
         const event = {
             Records: messages.map(
@@ -76,18 +82,18 @@ class ServerlessOfflineSQS {
                     MessageAttributes: messageAttributes,
                     MD5OfBody: md5OfBody
                 }) => ({
-                messageId,
-                receiptHandle,
-                body,
-                attributes,
-                messageAttributes,
-                md5OfBody,
-                eventSource: 'aws:sqs',
-                eventSourceARN: queueEvent.arn,
-                awsRegion: 'us-west-2'
-            })
-    )
-    };
+                    messageId,
+                    receiptHandle,
+                    body,
+                    attributes,
+                    messageAttributes,
+                    md5OfBody,
+                    eventSource: 'aws:sqs',
+                    eventSourceARN: queueEvent.arn,
+                    awsRegion: 'us-west-2'
+                })
+            )
+        };
 
         handler(event, lambdaContext, lambdaContext.done);
     }
@@ -118,7 +124,9 @@ class ServerlessOfflineSQS {
                     )
                 )
                 .then(({Messages}) =>
-                    fromCallback(cb => this.eventHandler(queueEvent, functionName, Messages, cb))
+                    fromCallback(cb => {
+                        return this.eventHandler(queueEvent, functionName, Messages, cb);
+                    })
                     .then(() => {
                         if (typeof Messages !== "undefined") {
                             return fromCallback(cb =>
@@ -128,8 +136,7 @@ class ServerlessOfflineSQS {
                                         ReceiptHandle: message.ReceiptHandle
                                     })),
                                     QueueUrl: queueUrl
-                                },
-                                cb
+                                }, cb
                             ));
                         } else {
                             return Promise.resolve();
@@ -139,6 +146,7 @@ class ServerlessOfflineSQS {
                 .then(() => readMessages())
                 .catch((err) => {
                     console.log(err);
+                    readMessages();
                 });
             }
             readMessages();
